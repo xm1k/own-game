@@ -1,28 +1,42 @@
 <template>
   <div id="app">
-    <img alt="Vue logo" src="./assets/logo.png">
-    <HelloWorld msg="Welcome to Your Vue.js App"/>
+    <StartPage v-if="currentPage === 'start'" @update-page="goToHomePage" />
+    <HomePage v-if="currentPage === 'home'" :username="username" @logout="logout" />
   </div>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
+import StartPage from './components/StartPage.vue'
+import HomePage from './components/HomePage.vue'
 
 export default {
-  name: 'App',
   components: {
-    HelloWorld
+    StartPage,
+    HomePage
+  },
+  data() {
+    return {
+      currentPage: 'start',
+      username: ''
+    }
+  },
+  methods: {
+    goToHomePage(username) {
+      this.username = username;
+      this.currentPage = 'home'; // Переключаем страницу на home
+    },
+    logout() {
+      this.username = '';
+      this.currentPage = 'start'; // При выходе возвращаем на стартовую страницу
+    }
   }
 }
 </script>
 
+
 <style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
+body {
+  padding: 0;
+  background-color: #5e87c4;
 }
 </style>
