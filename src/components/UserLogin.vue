@@ -56,7 +56,7 @@ export default {
   }
   .form-group input{
     width: 100%;
-    height: 30px;
+    height: 40px;
     border-radius: 15px;
     border: solid 2px #707070;
     padding-left: 15px;
@@ -66,13 +66,13 @@ export default {
   }
 
   button{
-    height: 30px;
+    height: 40px;
     width: auto;
     padding: 0 50px;
     border-radius: 10px;
     cursor: pointer;
     font-family: Arial;
-    font-size: 18px;
+    font-size: 20px;
     border: solid 2px #707070;
     transition: 0.3s;
   }
