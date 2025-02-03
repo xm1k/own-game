@@ -36,8 +36,8 @@ export default {
         });
 
         if (response.data.status === 'success') {
-          // Отправляем событие с именем пользователя родительскому компоненту
-          this.$emit('enter-success', response.data.name);
+          // Отправляем событие с объектом, содержащим имя и email, родительскому компоненту
+          this.$emit('enter-success', { username: response.data.name, email: this.email });
         }
       } catch (error) {
         console.error('Ошибка при регистрации:', error);
