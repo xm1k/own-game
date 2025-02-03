@@ -39,7 +39,7 @@ import LobbyPage from './LobbyPage.vue';
 
 export default {
   components: { LobbyPage },
-  props: ['username'],
+  props: ['username', 'email'],  // Принимаем email тоже
   data() {
     return {
       inLobby: false,
@@ -60,7 +60,7 @@ export default {
         const response = await fetch('http://localhost:5000/create-lobby', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lobby_name: this.newLobbyName, player_name: this.username })
+          body: JSON.stringify({ lobby_name: this.newLobbyName, email: this.email })
         });
         const data = await response.json();
         if (data.status === 'success') {
@@ -83,7 +83,7 @@ export default {
         const response = await fetch('http://localhost:5000/join-lobby', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lobby_code: this.lobbyCodeInput, player_name: this.username })
+          body: JSON.stringify({ lobby_code: this.lobbyCodeInput, email: this.email })
         });
         const data = await response.json();
         if (data.status === 'success') {

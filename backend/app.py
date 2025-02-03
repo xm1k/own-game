@@ -43,7 +43,7 @@ def register():
 def create_lobby():
     data = request.get_json()
     lobby_name = data.get('lobby_name')
-    player_name = data.get('player_name')  # Получаем имя создателя
+    player_name = data.get('email')  # Получаем имя создателя
 
     if not lobby_name or not player_name:
         return jsonify({'status': 'error', 'message': 'Название лобби или имя игрока не указано'}), 400
@@ -75,7 +75,7 @@ def create_lobby():
 def join_lobby():
     data = request.get_json()
     lobby_code = data.get('lobby_code')
-    player_name = data.get('player_name')
+    player_name = data.get('email')
 
     if not lobby_code or not player_name:
         return jsonify({'status': 'error', 'message': 'Не указан код лобби или имя игрока'}), 400
@@ -92,6 +92,7 @@ def join_lobby():
         'message': 'Вы присоединились к лобби',
         'lobby_code': lobby_code,
         'lobby_name': lobbies[lobby_code]['name'],
+        # СДЕЛАТЬ В БД ЧТОБЫ ПРИСЫЛАЛИСЬ НЕ ПОЧТЫ А ИМЕНА ПО ПОЧТАМ
         'players': lobbies[lobby_code]['players']
     }), 200
 
@@ -120,7 +121,7 @@ def get_lobby_info():
 def leave_lobby():
     data = request.get_json()
     lobby_code = data.get('lobby_code')
-    player_name = data.get('player_name')
+    player_name = data.get('email')
 
     if not lobby_code or not player_name:
         return jsonify({'status': 'error', 'message': 'Не указан код лобби или имя игрока'}), 400
