@@ -4,13 +4,13 @@
       <button
         @click="currentForm = 'login'"
         :class="{'active': currentForm === 'login'}"
-      >
+       style = "font-size: 25px;">
         Вход
       </button>
       <button
         @click="currentForm = 'register'"
         :class="{'active': currentForm === 'register'}"
-      >
+       style = "font-size: 25px;">
         Регистрация
       </button>
     </div>
@@ -41,7 +41,7 @@ export default {
   },
   methods: {
     goToHomePage(username) {
-      this.$emit('update-page', username); // Отправляем событие родительскому компоненту
+      this.$emit('update-page', username);
     }
   }
 }
