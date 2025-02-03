@@ -17,7 +17,7 @@
 
 <script>
 export default {
-  props: ['lobbyCode', 'playerName'],
+  props: ['lobbyCode', 'playerName', 'email'],
   data() {
     return {
       lobbyName: '',
@@ -72,6 +72,7 @@ export default {
           },
           body: JSON.stringify({
             lobby_code: this.lobbyCode,
+            email: this.email,
             player_name: this.playerName
           })
         });

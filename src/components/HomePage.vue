@@ -10,7 +10,7 @@
       <button @click="logout" class="red-but">Выход</button>
     </div>
 
-    <LobbyPage v-if="inLobby" :lobbyCode="lobbyCode" :playerName="username" @leave-lobby="leaveLobby" />
+    <LobbyPage v-if="inLobby" :lobbyCode="lobbyCode" :playerName="username" :email="email" @leave-lobby="leaveLobby" />
 
     <!-- Модальное окно для создания лобби -->
     <div v-if="showCreateLobbyModal" class="modal">
@@ -60,7 +60,7 @@ export default {
         const response = await fetch('http://localhost:5000/create-lobby', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lobby_name: this.newLobbyName, email: this.email })
+          body: JSON.stringify({ lobby_name: this.newLobbyName, email: this.email, player_name: this.username })
         });
         const data = await response.json();
         if (data.status === 'success') {
@@ -83,7 +83,7 @@ export default {
         const response = await fetch('http://localhost:5000/join-lobby', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lobby_code: this.lobbyCodeInput, email: this.email })
+          body: JSON.stringify({ lobby_code: this.lobbyCodeInput, email: this.email, player_name: this.username })
         });
         const data = await response.json();
         if (data.status === 'success') {

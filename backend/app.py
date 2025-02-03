@@ -42,6 +42,7 @@ def register():
 @app.route('/create-lobby', methods=['POST'])
 def create_lobby():
     data = request.get_json()
+    print(data)
     lobby_name = data.get('lobby_name')
     player_name = data.get('email')  # Получаем имя создателя
 
@@ -77,6 +78,8 @@ def join_lobby():
     lobby_code = data.get('lobby_code')
     player_name = data.get('email')
 
+    print(data)
+
     if not lobby_code or not player_name:
         return jsonify({'status': 'error', 'message': 'Не указан код лобби или имя игрока'}), 400
 
@@ -108,8 +111,6 @@ def get_lobby_info():
     if lobby_code not in lobbies:
         return jsonify({'status': 'error', 'message': 'Лобби не найдено'}), 404
 
-    print(lobbies[lobby_code]['name'], lobbies[lobby_code]['players'])
-
     return jsonify({
         'status': 'success',
         'lobby_name': lobbies[lobby_code]['name'],
@@ -122,6 +123,8 @@ def leave_lobby():
     data = request.get_json()
     lobby_code = data.get('lobby_code')
     player_name = data.get('email')
+
+    print(data)
 
     if not lobby_code or not player_name:
         return jsonify({'status': 'error', 'message': 'Не указан код лобби или имя игрока'}), 400
