@@ -31,12 +31,19 @@ export default {
           });
 
           if (response.data.status === 'success') {
-            // Отправляем событие с username и email родительскому компоненту
-            this.$emit('enter-success', { username: response.data.name, email: this.email });
+            // Сохраняем данные пользователя
+            localStorage.setItem('user', JSON.stringify({
+              email: this.email,
+              name: response.data.name
+            }));
+            this.$emit('enter-success', {
+              username: response.data.name,
+              email: this.email
+            });
           }
         } catch (error) {
-          console.error('Ошибка при отправке данных:', error);
-          alert('Ошибка при отправке данных на сервер');
+          console.error('Ошибка:', error);
+          alert('Ошибка авторизации');
         }
       }
   }

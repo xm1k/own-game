@@ -1,34 +1,39 @@
 <template>
   <div class="home-page">
     <div class="user">
-      <img src="../assets/user.webp" alt="" style="width: 80px;">
-      <h1>{{ username }}</h1>
-    </div>
-    <div v-if="!inLobby" class="actions">
-      <button @click="showCreateLobbyModal = true">Создать лобби</button>
-      <button @click="showJoinLobbyModal = true">Присоединиться к лобби</button>
-      <button @click="logout" class="red-but">Выход</button>
-    </div>
-
-    <LobbyPage v-if="inLobby" :lobbyCode="lobbyCode" :playerName="username" @leave-lobby="leaveLobby" />
-
-    <!-- Модальное окно для создания лобби -->
-    <div v-if="showCreateLobbyModal" class="modal">
-      <div class="modal-content">
-        <h2>Создание лобби</h2>
-        <input v-model="newLobbyName" placeholder="Название лобби" />
-        <button @click="confirmCreateLobby">Создать</button>
-        <button @click="closeModal" class="red-but">Отмена</button>
+      <div class="profile">
+        <img src="../assets/user.webp" alt="" style="height: 45px; margin-right: 10px;">
+        <h1>{{ username }}</h1>
       </div>
     </div>
+    <hr>
+    <div class="container">
+      <div v-if="!inLobby" class="actions">
+        <button @click="showCreateLobbyModal = true">Создать лобби</button>
+        <button @click="showJoinLobbyModal = true">Присоединиться к лобби</button>
+        <button @click="logout" class="red-but">Выход</button>
+      </div>
 
-    <!-- Модальное окно для присоединения к лобби -->
-    <div v-if="showJoinLobbyModal" class="modal">
-      <div class="modal-content">
-        <h2>Присоединение к лобби</h2>
-        <input v-model="lobbyCodeInput" placeholder="Код лобби" />
-        <button @click="confirmJoinLobby">Присоединиться</button>
-        <button @click="closeModal" class="red-but">Отмена</button>
+      <LobbyPage v-if="inLobby" :lobbyCode="lobbyCode" :playerName="username" :email="email" @leave-lobby="leaveLobby" />
+
+      <!-- Модальное окно для создания лобби -->
+      <div v-if="showCreateLobbyModal" class="modal">
+        <div class="modal-content">
+          <h2>Создание лобби</h2>
+          <input v-model="newLobbyName" placeholder="Название лобби" />
+          <button @click="confirmCreateLobby">Создать</button>
+          <button @click="closeModal" class="red-but">Отмена</button>
+        </div>
+      </div>
+
+      <!-- Модальное окно для присоединения к лобби -->
+      <div v-if="showJoinLobbyModal" class="modal">
+        <div class="modal-content">
+          <h2>Присоединение к лобби</h2>
+          <input v-model="lobbyCodeInput" placeholder="Код лобби" />
+          <button @click="confirmJoinLobby">Присоединиться</button>
+          <button @click="closeModal" class="red-but">Отмена</button>
+        </div>
       </div>
     </div>
   </div>
@@ -50,6 +55,14 @@ export default {
       lobbyCodeInput: ''
     };
   },
+  created() {
+    const userData = localStorage.getItem('lobby');
+    if (userData) {
+        const lobby = JSON.parse(userData);
+        this.lobbyCodeInput = lobby.code
+        this.confirmJoinLobby();
+    }
+  },
   methods: {
     async confirmCreateLobby() {
       if (!this.newLobbyName.trim()) {
@@ -57,13 +70,18 @@ export default {
         return;
       }
       try {
+
         const response = await fetch('http://localhost:5000/create-lobby', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lobby_name: this.newLobbyName, email: this.email })
+          body: JSON.stringify({ lobby_name: this.newLobbyName, email: this.email, player_name: this.username })
         });
         const data = await response.json();
         if (data.status === 'success') {
+          document.getElementsByClassName('profile')[0].style.marginLeft = "0px";
+          localStorage.setItem('lobby', JSON.stringify({
+              code: data.lobby_code
+            }));
           this.lobbyCode = data.lobby_code;
           this.inLobby = true;
         } else {
@@ -83,13 +101,18 @@ export default {
         const response = await fetch('http://localhost:5000/join-lobby', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lobby_code: this.lobbyCodeInput, email: this.email })
+          body: JSON.stringify({ lobby_code: this.lobbyCodeInput, email: this.email, player_name: this.username })
         });
         const data = await response.json();
         if (data.status === 'success') {
+          document.getElementsByClassName('profile')[0].style.marginLeft = "0px";
+          localStorage.setItem('lobby', JSON.stringify({
+              code: data.lobby_code
+            }));
           this.lobbyCode = this.lobbyCodeInput;
           this.inLobby = true;
         } else {
+          localStorage.removeItem('lobby');
           alert('Лобби не найдено');
         }
       } catch (error) {
@@ -104,11 +127,14 @@ export default {
       this.lobbyCodeInput = '';
     },
     leaveLobby() {
+      document.getElementsByClassName('profile')[0].style.marginLeft = "25%";
       this.inLobby = false;
       this.lobbyCode = '';
+      localStorage.removeItem('lobby');
     },
     logout() {
       this.$emit('logout');
+      localStorage.removeItem('lobby');
     }
   }
 };
@@ -154,24 +180,51 @@ button:hover{
   background-color: white;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  align-items: start;
   padding: 0px;
   width: 20%;
   border-radius: 25px;
   margin: 15px;
   padding-bottom: 20px;
-  padding-top: 10px;
+  padding-top: 0px;
+  
+}
 
+.container{
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .user{
+  background-color: #164a9e;
+  padding: 0px;
+  margin: 0px;
   font-family: Arial;
-  color: #446ead;
+  color: white;
   display: flex;
   height: 50px;
+  justify-content: start;
+  align-items: center;
+  transition-duration: 0.3s;
+  width: 100%;
+  height: 100%;
+  border-radius: 25px 0px;
+}
+
+.user img{
+  border-radius: 50%;
+  outline: solid 3px white;
+  outline-offset: -3px;
+}
+.profile{
+  width: 50%;
+  display: flex;
   justify-content: center;
   align-items: center;
+  margin-left: 25%;
+  transition-duration: 0.3s;
 }
 
 

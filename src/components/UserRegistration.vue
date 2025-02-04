@@ -8,7 +8,26 @@
         <input v-model="email" type="email" placeholder="Email" required />
       </div>
       <div class="form-group">
-        <input v-model="password" type="password" placeholder="Пароль" required />
+        <input 
+          v-model="password" 
+          type="password" 
+          placeholder="Пароль" 
+          required 
+          :class="{ 'error-border': showPasswordError }"
+        />
+      </div>
+      <div class="form-group">
+        <input 
+          v-model="confirmPassword" 
+          type="password" 
+          placeholder="Подтвердите пароль" 
+          required 
+          :class="{ 'error-border': showPasswordError }"
+          @input="checkPasswords"
+        />
+      </div>
+      <div  v-if="showPasswordError" class="error-message">
+        Пароли не совпадают!
       </div>
       <button type="submit">Зарегистрироваться</button>
     </form>
@@ -23,11 +42,23 @@ export default {
     return {
       email: '',
       password: '',
-      name: ''
+      confirmPassword: '',
+      name: '',
+      showPasswordError: false
     }
   },
   methods: {
+    checkPasswords() {
+      this.showPasswordError = this.password !== this.confirmPassword;
+    },
     async register() {
+      // Проверка совпадения паролей перед отправкой
+      if (this.password !== this.confirmPassword) {
+        this.showPasswordError = true;
+        alert('Пароли не совпадают');
+        return;
+      }
+
       try {
         const response = await axios.post('http://localhost:5000/register', {
           email: this.email,
@@ -36,12 +67,25 @@ export default {
         });
 
         if (response.data.status === 'success') {
-          // Отправляем событие с объектом, содержащим имя и email, родительскому компоненту
-          this.$emit('enter-success', { username: response.data.name, email: this.email });
+          localStorage.setItem('user', JSON.stringify({
+            email: this.email,
+            name: response.data.name
+          }));
+          this.$emit('enter-success', { 
+            username: response.data.name, 
+            email: this.email 
+          });
+          
+          // Очистка полей после успешной регистрации
+          this.email = '';
+          this.password = '';
+          this.confirmPassword = '';
+          this.name = '';
+          this.showPasswordError = false;
         }
       } catch (error) {
         console.error('Ошибка при регистрации:', error);
-        alert('Ошибка при регистрации');
+        alert(error.response?.data?.message || 'Ошибка при регистрации');
       }
     }
   }
@@ -88,5 +132,20 @@ export default {
     border: none;
     border-radius: 0px;
   }
+
+  .error-message {
+    width: 10%;
+    left: 45%;
+    bottom: 20%;
+    position: absolute;
+    background-color: white;
+    color: black;
+    margin-bottom: 10px;
+    font-size: 16px;
+    border: solid #ff4444 4px;
+    border-radius: 15px;
+    padding: 20px 0px;
+  }
+
 
   </style>
