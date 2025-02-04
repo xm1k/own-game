@@ -21,6 +21,17 @@ export default {
       email: ''  // Добавляем email в data
     }
   },
+  created() {
+    // Проверяем наличие данных при загрузке
+    const userData = localStorage.getItem('user');
+    if (userData) {
+        const user = JSON.parse(userData);
+        this.goToHomePage({ 
+            username: user.name,  // Правильное имя свойства
+            email: user.email     // и синтаксис объекта
+        });
+    }
+  },
   methods: {
     // Обновляем метод для работы с объектом, который содержит и username, и email
     goToHomePage({ username, email }) {
@@ -32,6 +43,7 @@ export default {
       this.username = '';
       this.email = '';  // Сбрасываем email
       this.currentPage = 'start'; // При выходе возвращаем на стартовую страницу
+      localStorage.removeItem('user');
     }
   }
 }

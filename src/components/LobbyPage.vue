@@ -37,27 +37,32 @@ export default {
     // Получение информации о лобби
     async fetchLobbyInfo() {
       try {
-        console.log("Отправка запроса на сервер get-lobby-info с кодом:", this.lobbyCode);
-        const response = await fetch('http://localhost:5000/get-lobby-info', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            lobby_code: this.lobbyCode
-          })
-        });
-        const data = await response.json();
-        console.log("Ответ от сервера:", data);
-        if (data.status === 'success') {
-          this.lobbyName = data.lobby_name;
-          this.players = data.players;
-        } else {
-          alert(data.message);
-          this.leaveLobby(true); // Если лобби не найдено, выйти
-        }
-      } catch (error) {
-        console.error('Ошибка при получении информации о лобби:', error);
+          const response = await fetch('http://localhost:5000/get-lobby-info', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ lobby_code: this.lobbyCode })
+          });
+          
+          const data = await response.json();
+          
+          if (data.status === 'success') {
+              this.lobbyName = data.lobby_name;
+              this.players = data.players;
+              
+              // Проверяем наличие текущего игрока в списке
+              const isPlayerInLobby = this.players.includes(this.email); // Или this.playerName
+              if (!isPlayerInLobby) {
+                  console.log('Игрок не найден в лобби, выполняем выход');
+                  this.leaveLobby();
+              }
+              
+          } else {
+              this.stopPolling();
+              this.$emit('leave-lobby');
+          }
+      }
+      catch (error) {
+          this.leaveLobby();
       }
     },
     // Покинуть лобби
@@ -88,6 +93,9 @@ export default {
         this.stopPolling();
         this.$emit('leave-lobby');
       } catch (error) {
+        this.stopPolling();
+        localStorage.removeItem('lobby');
+        this.$emit('leave-lobby');
         console.error("Ошибка при выходе из лобби:", error);
       }
     },
@@ -154,16 +162,20 @@ ul {
 
 .code {
   cursor: pointer;
-  color: #49824b;
   padding: 2px 5px;
   transition-duration: 0.3s;
   font-size: 25px;
   font-weight: bold;
+  color: white;
+  background-color: #49824b;
+  outline: 2px dashed #49824b;
+  outline-offset:-2px;
+
 }
 
 .code:hover {
-  background-color: #49824b;
-  color: white;
+  background-color: white;
+  color: #49824b;
 }
 
 .copied-message {
@@ -172,7 +184,7 @@ ul {
   color: #49824b;
   margin-left: 10px;
   text-align: center;
-  background-color: rgba(0,0,0,0.1);
+  background-color: rgba(235,235,235,1);
   padding: 8px;
 }
 
