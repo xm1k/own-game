@@ -41,15 +41,16 @@ def login():
     password = data.get('password')
 
     print('Email:', email, 'Password:', password)
-    q="select authorization('{}',{})".format(email,hashp(password)%1000000007)
+    q="select * from authorization('{}',{})".format(email,hashp(password)%1000000007)
     with engine.connect() as connect:
         res=connect.execute(text(q))
-        f=res.scalar()
         connect.commit()
-    print('pizdec nahui bluyat',f,hashp(password) % 1000000007)
-    if f:
-        return jsonify({'status': 'success', 'message': 'Вход успешен', 'name': "name"}), 200
-    return jsonify({'status': 'error', 'message': 'Неверный email или пароль'}), 400
+    for x in res:
+        f=x[0]
+        print(x[0])
+        if f:
+            return jsonify({'status': 'success', 'message': 'Вход успешен', 'name': x[2]}), 200
+        return jsonify({'status': 'error', 'message': 'Неверный email или пароль'}), 400
 
 
 @app.route('/register', methods=['POST'])
@@ -58,7 +59,6 @@ def register():
     email = data.get('email')
     password = data.get('password')
     name = data.get('name')
-    print("goida")
     print(f"Регистрация: {email}, {password}, {name}")
     q=f"select add_user('{name}','{email}',{hashp(password)%1000000007})"
     with engine.connect() as connect:
@@ -71,6 +71,7 @@ def register():
 
 @app.route('/create-lobby', methods=['POST'])
 def create_lobby():
+    print("CREATE")
     data = request.get_json()
     print(data)
     lobby_name = data.get('lobby_name')
@@ -79,13 +80,25 @@ def create_lobby():
     if not lobby_name or not player_name:
         return jsonify({'status': 'error', 'message': 'Название лобби или имя игрока не указано'}), 400
 
+    q=f"select * from get_info_p('{player_name}')"
+    with engine.connect() as connect:
+        res=connect.execute(text(q))
+        connect.commit()
+    temp=()
+    for x in res:
+        temp=x
+    id=temp[0]
+    #p_name=res[0][1]
+    q=f"select * from add_lobby('{lobby_name}',0,{id})"
+    with engine.connect() as connect:
+        res=connect.execute(text(q))
+        connect.commit()
     # Генерация уникального кода лобби
-    lobby_code = str(random.randint(1000, 9999))
-    while lobby_code in lobbies:
-        lobby_code = str(random.randint(1000, 9999))
-
+    lobby_code=0
+    for x in res:
+        lobby_code=int(x[0])
     # Создание лобби с добавлением владельца отдельно
-    lobbies[lobby_code] = {
+    lobbies[int(lobby_code)] = {
         'name': lobby_name,
         'owner': player_name,  # Сохранение владельца отдельно
         'players': [player_name]  # Добавляем владельца в список игроков
@@ -104,37 +117,52 @@ def create_lobby():
 
 @app.route('/join-lobby', methods=['POST'])
 def join_lobby():
+    print("JOIN")
     data = request.get_json()
-    lobby_code = data.get('lobby_code')
+    lobby_code = int(data.get('lobby_code'))
     player_name = data.get('email')
 
     print(data)
-
+    print(lobbies)
+    print(lobby_code, lobbies[(lobby_code)])
+    print(lobby_code not in lobbies)
     if not lobby_code or not player_name:
         return jsonify({'status': 'error', 'message': 'Не указан код лобби или имя игрока'}), 400
 
-    if lobby_code not in lobbies:
+    if int(lobby_code) not in lobbies:
         return jsonify({'status': 'error', 'message': 'Лобби не найдено'}), 404
 
     # Добавление игрока в лобби
-    if(player_name not in lobbies[lobby_code]['players']):
+    if(player_name not in lobbies[int(lobby_code)]['players']):
         lobbies[lobby_code]['players'].append(player_name)
-
+    q=f"select * from get_info_p('{player_name}')"
+    with engine.connect() as connect:
+        r=connect.execute(text(q))
+        connect.commit()
+    for x in r:
+        res=x
+    id=res[0]
+    q=f"select add_user_in_lobby({id},{lobby_code})"
+    with engine.connect() as connect:
+        connect.execute(text(q))
+        connect.commit()  
+    print("да не выходи ты нахуй")
     return jsonify({
         'status': 'success',
         'message': 'Вы присоединились к лобби',
         'lobby_code': lobby_code,
-        'lobby_name': lobbies[lobby_code]['name'],
+        'lobby_name': lobbies[int(lobby_code)]['name'],
         # СДЕЛАТЬ В БД ЧТОБЫ ПРИСЫЛАЛИСЬ НЕ ПОЧТЫ А ИМЕНА ПО ПОЧТАМ
-        'players': lobbies[lobby_code]['players']
+        'players': lobbies[int(lobby_code)]['players']
     }), 200
 
 
 @app.route('/get-lobby-info', methods=['POST'])
 def get_lobby_info():
+    print("GET INFO")
     data = request.get_json()
     lobby_code = data.get('lobby_code')
-
+    print(lobby_code, lobby_code not in lobbies)
     if not lobby_code:
         return jsonify({'status': 'error', 'message': 'Код лобби не указан'}), 400
 
@@ -150,27 +178,27 @@ def get_lobby_info():
 
 @app.route('/leave-lobby', methods=['POST'])
 def leave_lobby():
+    print("LEAVE")
     data = request.get_json()
     lobby_code = data.get('lobby_code')
     player_name = data.get('email')
 
     print(data)
-
     if not lobby_code or not player_name:
         return jsonify({'status': 'error', 'message': 'Не указан код лобби или имя игрока'}), 400
 
-    if lobby_code not in lobbies:
+    if (lobby_code) not in lobbies:
         return jsonify({'status': 'error', 'message': 'Лобби не найдено'}), 404
 
     # Удаление игрока из лобби
-    if player_name in lobbies[lobby_code]['players']:
-        lobbies[lobby_code]['players'].remove(player_name)
+    if player_name in lobbies[(lobby_code)]['players']:
+        lobbies[(lobby_code)]['players'].remove(player_name)
 
     return jsonify({
         'status': 'success',
         'message': 'Вы покинули лобби',
-        'lobby_name': lobbies[lobby_code]['name'],
-        'players': lobbies[lobby_code]['players']
+        'lobby_name': lobbies[(lobby_code)]['name'],
+        'players': lobbies[(lobby_code)]['players']
     }), 200
 
 
