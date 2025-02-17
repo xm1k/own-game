@@ -144,5 +144,16 @@ def leave_lobby():
     }), 200
 
 
+@app.route('/click-timestamp', methods=['POST'])
+def receive_click_timestamp():
+    data = request.json
+    timestamp = data.get('timestamp', '')
+    email = data.get('email', 'Не указан')  # Получаем email
+
+    print(f"Пользователь {email} нажал кнопку в {timestamp} мс")
+
+    return jsonify({'status': 'success', 'received_timestamp': timestamp, 'email': email})
+
+
 if __name__ == '__main__':
     app.run(debug=True)

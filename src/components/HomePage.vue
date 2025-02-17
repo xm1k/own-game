@@ -1,41 +1,44 @@
 <template>
   <div class="home-page">
-    <div class="user">
-      <div class="profile">
-        <img src="../assets/user.webp" alt="" style="height: 45px; margin-right: 10px;">
-        <h1>{{ username }}</h1>
-      </div>
-    </div>
-    <hr>
-    <div class="container">
-      <div v-if="!inLobby" class="actions">
-        <button @click="showCreateLobbyModal = true">Создать лобби</button>
-        <button @click="showJoinLobbyModal = true">Присоединиться к лобби</button>
-        <button @click="logout" class="red-but">Выход</button>
-      </div>
-
-      <LobbyPage v-if="inLobby" :lobbyCode="lobbyCode" :playerName="username" :email="email" @leave-lobby="leaveLobby" />
-
-      <!-- Модальное окно для создания лобби -->
-      <div v-if="showCreateLobbyModal" class="modal">
-        <div class="modal-content">
-          <h2>Создание лобби</h2>
-          <input v-model="newLobbyName" placeholder="Название лобби" />
-          <button @click="confirmCreateLobby">Создать</button>
-          <button @click="closeModal" class="red-but">Отмена</button>
+    <div class="panel-block">
+      <div class="user">
+        <div class="profile">
+          <img src="../assets/user.webp" alt="" style="height: 45px; margin-right: 10px;">
+          <h1>{{ username }}</h1>
         </div>
       </div>
+      <hr>
+      <div class="container">
+        <div v-if="!inLobby" class="actions">
+          <button @click="showCreateLobbyModal = true">Создать лобби</button>
+          <button @click="showJoinLobbyModal = true">Присоединиться к лобби</button>
+          <button @click="logout" class="red-but">Выход</button>
+        </div>
 
-      <!-- Модальное окно для присоединения к лобби -->
-      <div v-if="showJoinLobbyModal" class="modal">
-        <div class="modal-content">
-          <h2>Присоединение к лобби</h2>
-          <input v-model="lobbyCodeInput" placeholder="Код лобби" />
-          <button @click="confirmJoinLobby">Присоединиться</button>
-          <button @click="closeModal" class="red-but">Отмена</button>
+        <LobbyPage v-if="inLobby" :lobbyCode="lobbyCode" :playerName="username" :email="email" @leave-lobby="leaveLobby" />
+
+        <!-- Модальное окно для создания лобби -->
+        <div v-if="showCreateLobbyModal" class="modal">
+          <div class="modal-content">
+            <h2>Создание лобби</h2>
+            <input v-model="newLobbyName" placeholder="Название лобби" />
+            <button @click="confirmCreateLobby">Создать</button>
+            <button @click="closeModal" class="red-but">Отмена</button>
+          </div>
+        </div>
+
+        <!-- Модальное окно для присоединения к лобби -->
+        <div v-if="showJoinLobbyModal" class="modal">
+          <div class="modal-content">
+            <h2>Присоединение к лобби</h2>
+            <input v-model="lobbyCodeInput" placeholder="Код лобби" />
+            <button @click="confirmJoinLobby">Присоединиться</button>
+            <button @click="closeModal" class="red-but">Отмена</button>
+          </div>
         </div>
       </div>
     </div>
+    <button v-if="inLobby" @click="sendClickTimestamp" class="big-but"></button>
   </div>
 </template>
 
@@ -64,6 +67,24 @@ export default {
     }
   },
   methods: {
+    async sendClickTimestamp() {
+      const timestamp = Date.now(); // Точное время в миллисекундах
+      try {
+        const response = await fetch('http://localhost:5000/click-timestamp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            timestamp,
+            email: this.email  // Отправляем email
+          })
+        });
+
+        const data = await response.json();
+        console.log("Ответ от сервера:", data);
+      } catch (error) {
+        console.error("Ошибка при отправке времени:", error);
+      }
+    },
     async confirmCreateLobby() {
       if (!this.newLobbyName.trim()) {
         alert('Введите название лобби');
@@ -166,6 +187,37 @@ button:hover{
   color: white;
 }
 
+.big-but {
+  position: absolute;
+  left: 45%;
+  width: 10%;
+  height: 100px;
+  background-color: red;
+  border-radius: 50%;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  box-shadow: 0px 15px 0px darkred;
+  transition: all 0.2s ease-in-out;
+  top: 40%;
+
+}
+
+.big-but:hover{
+  top: 41%;
+  background-color: red;
+  border-radius: 50%;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  box-shadow: 0px 10px 0px darkred;
+}
+
+.big-but:active{
+  top: 43%;
+  box-shadow: 0px 0px 0px darkred;
+}
+
 .red-but:hover{
   background-color: #d95252;
 }
@@ -176,7 +228,7 @@ button:hover{
   flex-direction: column;
 }
   
-.home-page{
+.panel-block{
   background-color: white;
   display: flex;
   flex-direction: column;
