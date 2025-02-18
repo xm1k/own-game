@@ -75,7 +75,8 @@ export default {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             timestamp,
-            email: this.email  // Отправляем email
+            email: this.email,  // Отправляем email
+            lobby_code: this.lobbyCode
           })
         });
 

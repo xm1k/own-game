@@ -1,10 +1,11 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit, join_room, leave_room
 import random
 
 app = Flask(__name__)
 CORS(app)
-
+socketio = SocketIO(app, cors_allowed_origins="*")
 # Временное хранилище для лобби (в реальном приложении используйте базу данных)
 lobbies = {}
 
@@ -60,6 +61,11 @@ def create_lobby():
         'owner': player_name,  # Сохранение владельца отдельно
         'players': [player_name]  # Добавляем владельца в список игроков
     }
+
+    socketio.emit('lobby_created', {
+        'lobby_code': lobby_code,
+        'player_name': player_name
+    })
 
     return jsonify({
         'status': 'success',
@@ -149,11 +155,76 @@ def receive_click_timestamp():
     data = request.json
     timestamp = data.get('timestamp', '')
     email = data.get('email', 'Не указан')  # Получаем email
+    lobby_code = data.get('lobby_code')
 
-    print(f"Пользователь {email} нажал кнопку в {timestamp} мс")
+    print(f"Пользователь {email} нажал кнопку в {timestamp} мс, в лобби: {lobby_code}")
 
     return jsonify({'status': 'success', 'received_timestamp': timestamp, 'email': email})
 
 
+@socketio.on('connect')
+def handle_connect():
+    print('Клиент подключился:', request.sid)
+
+@socketio.on('leave_lobby')
+def handle_leave_lobby(data):
+    lobby_code = data['lobby_code']
+    user_id = data['user_id']
+    leave_room(lobby_code)
+    leave_room(user_id)
+    emit('user_left', {'user_id': user_id}, room=lobby_code)
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Клиент отключился:', request.sid)
+
+@socketio.on('join_lobby')
+def handle_join_lobby(data):
+    lobby_code = data['lobby_code']
+    user_id = data['user_id']
+    join_room(lobby_code)  # Комната лобби для широковещательных сообщений
+    join_room(user_id)     # Персональная комната для прямых сообщений
+    print(f"User {user_id} joined lobby {lobby_code}")
+    emit('user_joined', {'user_id': user_id}, room=lobby_code)
+
+
+@socketio.on('webrtc_answer')
+def handle_answer(data):
+    if not all(k in data for k in ['answer', 'sender_id', 'target_id']):
+        print("Ошибка: отсутствуют необходимые данные в webrtc_answer", data)
+        return
+
+    emit('webrtc_answer', {
+        'answer': data['answer'],
+        'sender_id': data['sender_id']
+    }, to=data['target_id'])
+
+
+@socketio.on('webrtc_offer')
+def handle_offer(data):
+    sender_id = data.get('sender_id')
+    if not sender_id:
+        print("Ошибка: отсутствует sender_id в webrtc_offer", data)
+        return  # Пропускаем обработку, если sender_id нет
+
+    emit('webrtc_offer', {
+        'offer': data['offer'],
+        'sender_id': sender_id
+    }, to=data['target_id'])
+
+@socketio.on('ice_candidate')
+def handle_ice_candidate(data):
+    sender_id = data.get('sender_id')
+    if not sender_id:
+        print("Ошибка: отсутствует sender_id в ice_candidate", data)
+        return  # Пропускаем обработку
+
+    emit('ice_candidate', {
+        'candidate': data['candidate'],
+        'sender_id': sender_id
+    }, to=data['target_id'])
+
+
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    socketio.run(app, debug=True, host="0.0.0.0", port=5000)
