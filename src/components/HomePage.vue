@@ -15,7 +15,7 @@
           <button @click="logout" class="red-but">Выход</button>
         </div>
 
-        <LobbyPage v-if="inLobby" :lobbyCode="lobbyCode" :playerName="username" :email="email" @leave-lobby="leaveLobby" />
+        <LobbyPage v-if="inLobby" :lobbyCode="lobbyCode" :playerName="username" :email="email" @leave-lobby="leaveLobby" @update-lobby-info="updateLobbyInfo" />
 
         <!-- Модальное окно для создания лобби -->
         <div v-if="showCreateLobbyModal" class="modal">
@@ -38,13 +38,19 @@
         </div>
       </div>
     </div>
-    <button v-if="inLobby" @click="sendClickTimestamp" class="big-but"></button>
+    <button v-if="inLobby&&shouldShowBigBut" @click="sendClickTimestamp" class="big-but"></button>
+    <h1 v-if="respondent !== '' && inLobby" style="color: white; position: absolute; right: 45%; top: 20px; margin-top: 0px;">Отвечает {{respondent}}</h1>
+
+    <div v-if="respondent !== '' && this.email == this.owner && inLobby" class="response-buttons">
+      <button @click="sendResponse('correct')" class="correct-but">Верно</button>
+      <button @click="sendResponse('incorrect')" class="incorrect-but">Не верно</button>
+    </div>
+
   </div>
 </template>
 
 <script>
 import LobbyPage from './LobbyPage.vue';
-
 export default {
   components: { LobbyPage },
   props: ['username', 'email'],  // Принимаем email тоже
@@ -55,7 +61,10 @@ export default {
       showCreateLobbyModal: false,
       showJoinLobbyModal: false,
       newLobbyName: '',
-      lobbyCodeInput: ''
+      lobbyCodeInput: '',
+      owner: '',
+      respondent: '',
+      shouldShowBigBut: false
     };
   },
   created() {
@@ -67,6 +76,33 @@ export default {
     }
   },
   methods: {
+    async sendResponse(status) {
+      try {
+        const response = await fetch('http://localhost:5000/responsestatus', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: status,
+            lobby_code: this.lobbyCode
+          })
+        });
+        const data = await response.json();
+        console.log("Ответ от сервера:", data);
+      } catch (error) {
+        console.error("Ошибка при отправке статуса ответа:", error);
+      }
+    },
+    updateLobbyInfo({ owner, respondent }) {
+      this.owner = owner;
+
+      this.respondent = respondent;
+      if (this.respondent === "" && this.email != this.owner){
+        this.shouldShowBigBut = true;
+      }
+      else{
+        this.shouldShowBigBut = false;
+      }
+    },
     async sendClickTimestamp() {
       const timestamp = Date.now(); // Точное время в миллисекундах
       try {
@@ -163,6 +199,8 @@ export default {
 </script>
 
 <style>
+
+
   
 body{
   padding: 0px;
@@ -323,4 +361,38 @@ button {
 .modal-content button {
   margin: 5px;
 }
+
+.response-buttons {
+  position: absolute;
+  right: 45%;
+  top: 100px;
+  display: flex;
+  gap: 10px;
+}
+
+.correct-but, .incorrect-but {
+  background-color: white;
+  border-radius: 5px;
+  border: 0px;
+  transition-duration: 0.3s;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 10px 20px;
+}
+
+.correct-but:hover {
+  background-color: green;
+  color: white;
+  border: 0px;
+  padding: 10px 20px;
+}
+
+.incorrect-but:hover {
+  background-color: red;
+  color: white;
+  border: 0px;
+  padding: 10px 20px;
+}
+
+
 </style>

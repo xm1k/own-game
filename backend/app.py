@@ -2,12 +2,92 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import random
+import threading
+import time
+
+clicks_per_lobby = {}
 
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 # Временное хранилище для лобби (в реальном приложении используйте базу данных)
 lobbies = {}
+
+def get_sorted_players(lobby_code):
+    """Возвращает отсортированный список игроков с очками"""
+    lobby = lobbies[lobby_code]
+    online_players = lobby['online']
+
+    # Создаем список пар (очки, игрок) для онлайн игроков
+    players_with_scores = []
+    for player in online_players:
+        try:
+            index = lobby['players'].index(player)
+            players_with_scores.append({
+                'player': player,
+                'score': lobby['score'][index]
+            })
+        except ValueError:
+            continue
+
+    # Сортируем по убыванию очков
+    sorted_players = sorted(players_with_scores,
+                            key=lambda x: x['score'],
+                            reverse=True)
+
+    # Форматируем результат
+    return [{
+        'player': item['player'],
+        'score': item['score']
+    } for item in sorted_players]
+
+
+def get_sorted_players_and_scores(lobby_code):
+    """Возвращает два списка: игроки и их очки, отсортированные по убыванию"""
+    lobby = lobbies[lobby_code]
+
+    # Собираем пары (email, score) для онлайн-игроков
+    players_with_scores = []
+    for email in lobby['online']:
+        try:
+            idx = lobby['players'].index(email)
+            players_with_scores.append((email, lobby['score'][idx]))
+        except (ValueError, IndexError):
+            continue
+
+    # Сортируем по убыванию очков
+    sorted_data = sorted(players_with_scores, key=lambda x: x[1], reverse=True)
+
+    # Разделяем на отдельные списки
+    return [item[0] for item in sorted_data], [item[1] for item in sorted_data]
+
+def get_sorted_players(lobby_code):
+    """Возвращает отсортированный список игроков с очками"""
+    lobby = lobbies[lobby_code]
+    online_players = lobby['online']
+
+    # Создаем список пар (очки, игрок) для онлайн игроков
+    players_with_scores = []
+    for player in online_players:
+        try:
+            index = lobby['players'].index(player)
+            players_with_scores.append({
+                'player': player,
+                'score': lobby['score'][index]
+            })
+        except ValueError:
+            continue
+
+    # Сортируем по убыванию очков
+    sorted_players = sorted(players_with_scores,
+                            key=lambda x: x['score'],
+                            reverse=True)
+
+    # Форматируем результат
+    return [{
+        'player': item['player'],
+        'score': item['score']
+    } for item in sorted_players]
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -24,6 +104,33 @@ def login():
     if email == 'a@b' and password == 'c':
         return jsonify({'status': 'success', 'message': 'Вход успешен', 'name': "name"}), 200
     return jsonify({'status': 'error', 'message': 'Неверный email или пароль'}), 400
+
+@app.route('/responsestatus', methods=['POST'])
+def responsestatus():
+    data = request.get_json()
+    if not data:
+        return jsonify({'status': 'error', 'message': 'No JSON data received'}), 400
+
+    l_code = data.get('lobby_code')
+    status = data.get('status')
+
+    if l_code not in lobbies:
+        return jsonify({'status': 'error', 'message': 'Lobby not found'}), 404
+
+    lobby = lobbies[l_code]
+    respondent = lobby['respondent']
+
+    if status == 'correct' and respondent in lobby['players']:
+        try:
+            # Находим индекс ответившего
+            index = lobby['players'].index(respondent)
+            # Увеличиваем счет
+            lobby['score'][index] += 1
+        except (ValueError, IndexError) as e:
+            print(f"Error updating score: {e}")
+
+    lobby['respondent'] = ''
+    return jsonify({'status': 'success'}), 200
 
 
 @app.route('/register', methods=['POST'])
@@ -59,7 +166,10 @@ def create_lobby():
     lobbies[lobby_code] = {
         'name': lobby_name,
         'owner': player_name,  # Сохранение владельца отдельно
-        'players': [player_name]  # Добавляем владельца в список игроков
+        'players': [player_name],
+        'online': [player_name],
+        'score': [0],
+        'respondent': ''
     }
 
     socketio.emit('lobby_created', {
@@ -73,7 +183,7 @@ def create_lobby():
         'lobby_code': lobby_code,
         'lobby_name': lobby_name,
         'owner': player_name,  # Отправляем владельца клиенту
-        'players': lobbies[lobby_code]['players']
+        'players': lobbies[lobby_code]['online']
     }), 201
 
 
@@ -84,8 +194,6 @@ def join_lobby():
     lobby_code = data.get('lobby_code')
     player_name = data.get('email')
 
-    print(data)
-
     if not lobby_code or not player_name:
         return jsonify({'status': 'error', 'message': 'Не указан код лобби или имя игрока'}), 400
 
@@ -93,18 +201,43 @@ def join_lobby():
         return jsonify({'status': 'error', 'message': 'Лобби не найдено'}), 404
 
     # Добавление игрока в лобби
-    if(player_name not in lobbies[lobby_code]['players']):
+    if player_name not in lobbies[lobby_code]['players']:
         lobbies[lobby_code]['players'].append(player_name)
+        lobbies[lobby_code]['score'].append(0)  # Добавляем начальный счет
+
+    if player_name not in lobbies[lobby_code]['online']:
+        lobbies[lobby_code]['online'].append(player_name)
 
     return jsonify({
         'status': 'success',
         'message': 'Вы присоединились к лобби',
         'lobby_code': lobby_code,
         'lobby_name': lobbies[lobby_code]['name'],
-        # СДЕЛАТЬ В БД ЧТОБЫ ПРИСЫЛАЛИСЬ НЕ ПОЧТЫ А ИМЕНА ПО ПОЧТАМ
-        'players': lobbies[lobby_code]['players']
+        'players': get_sorted_players(lobby_code)
     }), 200
 
+def process_lobby_clicks(lobby_code):
+    """ Ждет секунду после первого клика и определяет победителя. """
+    time.sleep(1)  # Ждем секунду после первого клика
+
+    if lobby_code in clicks_per_lobby and clicks_per_lobby[lobby_code]:
+        # Сортируем клики по времени
+        sorted_clicks = sorted(clicks_per_lobby[lobby_code], key=lambda x: x['timestamp'])
+        winner = sorted_clicks[0]  # Первый клик — победитель
+
+        print(f"Победитель в лобби {lobby_code}: {winner['email']} нажал в {winner['timestamp']} мс")
+
+        lobbies[lobby_code]['respondent'] = winner['email']
+
+        # Отправляем результат в лобби через WebSocket
+        socketio.emit('click_winner', {
+            'lobby_code': lobby_code,
+            'winner_email': winner['email'],
+            'winner_timestamp': winner['timestamp']
+        }, room=lobby_code)
+
+        # Очищаем список кликов для этого лобби
+        clicks_per_lobby.pop(lobby_code, None)
 
 @app.route('/get-lobby-info', methods=['POST'])
 def get_lobby_info():
@@ -117,10 +250,16 @@ def get_lobby_info():
     if lobby_code not in lobbies:
         return jsonify({'status': 'error', 'message': 'Лобби не найдено'}), 404
 
+    # Получаем отсортированные данные
+    sorted_players, sorted_scores = get_sorted_players_and_scores(lobby_code)
+
     return jsonify({
         'status': 'success',
         'lobby_name': lobbies[lobby_code]['name'],
-        'players': lobbies[lobby_code]['players']
+        'players': sorted_players,    # Список email отсортированных по очкам
+        'scores': sorted_scores,      # Соответствующие очки
+        'owner': lobbies[lobby_code]['owner'],
+        'respondent': lobbies[lobby_code]['respondent']
     }), 200
 
 
@@ -139,25 +278,37 @@ def leave_lobby():
         return jsonify({'status': 'error', 'message': 'Лобби не найдено'}), 404
 
     # Удаление игрока из лобби
-    if player_name in lobbies[lobby_code]['players']:
-        lobbies[lobby_code]['players'].remove(player_name)
+    if player_name in lobbies[lobby_code]['online']:
+        lobbies[lobby_code]['online'].remove(player_name)
 
     return jsonify({
         'status': 'success',
         'message': 'Вы покинули лобби',
         'lobby_name': lobbies[lobby_code]['name'],
-        'players': lobbies[lobby_code]['players']
+        'players': lobbies[lobby_code]['online']
     }), 200
 
 
 @app.route('/click-timestamp', methods=['POST'])
 def receive_click_timestamp():
     data = request.json
-    timestamp = data.get('timestamp', '')
-    email = data.get('email', 'Не указан')  # Получаем email
+    timestamp = data.get('timestamp')
+    email = data.get('email', 'Не указан')
     lobby_code = data.get('lobby_code')
 
+    if not timestamp or not lobby_code:
+        return jsonify({'status': 'error', 'message': 'Нет данных о клике'}), 400
+
     print(f"Пользователь {email} нажал кнопку в {timestamp} мс, в лобби: {lobby_code}")
+
+    # Добавляем клик в хранилище
+    if lobby_code not in clicks_per_lobby:
+        clicks_per_lobby[lobby_code] = []
+        # Запускаем поток для обработки кликов в этом лобби
+        thread = threading.Thread(target=process_lobby_clicks, args=(lobby_code,))
+        thread.start()
+
+    clicks_per_lobby[lobby_code].append({'email': email, 'timestamp': timestamp})
 
     return jsonify({'status': 'success', 'received_timestamp': timestamp, 'email': email})
 
@@ -228,3 +379,6 @@ def handle_ice_candidate(data):
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, host="0.0.0.0", port=5000)
+
+####
+
