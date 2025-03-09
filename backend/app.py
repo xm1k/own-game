@@ -8,7 +8,37 @@ def hashp(password) :
     for l in password:
         h=h * 257+int(l)
     return h
+def expected_score(rating_a, rating_b):
+    """
+    Рассчитывает ожидаемый результат для игрока A против игрока B.
+    """
+    return 1 / (1 + 10 ** ((rating_b - rating_a) / 400))
 
+def update_elo_ratings(ratings, results, k=32):
+    """
+    Обновляет рейтинги игроков на основе результатов матча.
+
+    :param ratings: Список текущих рейтингов игроков.
+    :param results: Список результатов, где 1 — победа, 0 — поражение, 0.5 — ничья.
+    :param k: Коэффициент K для системы Эло (по умолчанию 32).
+    :return: Список обновленных рейтингов.
+    """
+    n = len(ratings)
+    new_ratings = ratings.copy()
+
+    for i in range(n):
+        actual_score = results[i]
+        expected_score_total = 0
+
+        # Рассчитываем общий ожидаемый результат для игрока i
+        for j in range(n):
+            if i != j:
+                expected_score_total += expected_score(ratings[i], ratings[j])
+
+        # Обновляем рейтинг игрока i
+        new_ratings[i] += k * (actual_score - expected_score_total)
+
+    return new_ratings
 app = Flask(__name__)
 CORS(app)
 def anti_sqlin(text):
