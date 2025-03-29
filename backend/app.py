@@ -113,6 +113,7 @@ def responsestatus():
 
     l_code = data.get('lobby_code')
     status = data.get('status')
+    nominal = data.get('nominal', 1)  # По умолчанию 1, если номинал не передан
 
     if l_code not in lobbies:
         return jsonify({'status': 'error', 'message': 'Lobby not found'}), 404
@@ -120,18 +121,18 @@ def responsestatus():
     lobby = lobbies[l_code]
     respondent = lobby['respondent']
 
-    if status == 'correct' and respondent in lobby['players']:
+    if respondent in lobby['players']:
         try:
-            # Находим индекс ответившего
             index = lobby['players'].index(respondent)
-            # Увеличиваем счет
-            lobby['score'][index] += 1
+            if status == 'correct':
+                lobby['score'][index] += nominal
+            else:
+                lobby['score'][index] -= nominal
         except (ValueError, IndexError) as e:
             print(f"Error updating score: {e}")
 
     lobby['respondent'] = ''
     return jsonify({'status': 'success'}), 200
-
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -146,35 +147,84 @@ def register():
         return jsonify({'status': 'success', 'message': 'Регистрация успешна', 'name': name}), 201
     return jsonify({'status': 'error', 'message': 'Ошибка регистрации'}), 400
 
+@app.route('/next-question', methods=['POST'])
+def next_question():
+    data = request.get_json()
+    lobby_code = data.get('lobby_code')
+
+    if lobby_code not in lobbies:
+        return jsonify({'status': 'error', 'message': 'Лобби не найдено'}), 404
+
+    lobby = lobbies[lobby_code]
+    lobby['question_number'] = lobby.get('question_number', 1) + 1
+    question_number = lobby['question_number']
+    # Циклический номинал: 10,20,30,40,50,10,20...
+    question_nominal = 10 * (((question_number - 1) % 5) + 1)
+    lobby['question_nominal'] = question_nominal
+
+    # Отправляем событие всем игрокам в лобби
+    socketio.emit('next_question', {
+        'lobby_code': lobby_code,
+        'question_number': question_number,
+        'question_nominal': question_nominal
+    }, room=lobby_code)
+
+    return jsonify({
+        'status': 'success',
+        'question_number': question_number,
+        'question_nominal': question_nominal
+    }), 200
+
+
+@app.route('/delete-lobby', methods=['POST'])
+def delete_lobby():
+    data = request.get_json()
+    lobby_code = data.get('lobby_code')
+
+    if not lobby_code:
+        return jsonify({'status': 'error', 'message': 'Код лобби не указан'}), 400
+    if lobby_code not in lobbies:
+        return jsonify({'status': 'error', 'message': 'Лобби не найдено'}), 404
+
+    # Эмитим событие, чтобы уведомить всех участников, что лобби закрыто
+    socketio.emit('lobby_deleted', {'lobby_code': lobby_code}, room=lobby_code)
+
+    # Удаляем лобби из временного хранилища
+    del lobbies[lobby_code]
+
+    return jsonify({'status': 'success', 'message': 'Лобби успешно удалено'}), 200
+
 
 @app.route('/create-lobby', methods=['POST'])
 def create_lobby():
     data = request.get_json()
-    print(data)
     lobby_name = data.get('lobby_name')
-    player_name = data.get('email')  # Получаем имя создателя
+    player_name = data.get('email')  # Получаем email создателя как имя
 
     if not lobby_name or not player_name:
         return jsonify({'status': 'error', 'message': 'Название лобби или имя игрока не указано'}), 400
 
-    # Генерация уникального кода лобби
     lobby_code = str(random.randint(1000, 9999))
     while lobby_code in lobbies:
         lobby_code = str(random.randint(1000, 9999))
 
-    # Создание лобби с добавлением владельца отдельно
+    # Инициализация лобби с вопросом
     lobbies[lobby_code] = {
         'name': lobby_name,
-        'owner': player_name,  # Сохранение владельца отдельно
+        'owner': player_name,
         'players': [player_name],
         'online': [player_name],
         'score': [0],
-        'respondent': ''
+        'respondent': '',
+        'question_number': 1,
+        'question_nominal': 10
     }
 
     socketio.emit('lobby_created', {
         'lobby_code': lobby_code,
-        'player_name': player_name
+        'player_name': player_name,
+        'question_number': 1,
+        'question_nominal': 10
     })
 
     return jsonify({
@@ -182,10 +232,11 @@ def create_lobby():
         'message': 'Лобби создано',
         'lobby_code': lobby_code,
         'lobby_name': lobby_name,
-        'owner': player_name,  # Отправляем владельца клиенту
-        'players': lobbies[lobby_code]['online']
+        'owner': player_name,
+        'players': lobbies[lobby_code]['online'],
+        'question_number': 1,
+        'question_nominal': 10
     }), 201
-
 
 
 @app.route('/join-lobby', methods=['POST'])
@@ -213,7 +264,9 @@ def join_lobby():
         'message': 'Вы присоединились к лобби',
         'lobby_code': lobby_code,
         'lobby_name': lobbies[lobby_code]['name'],
-        'players': get_sorted_players(lobby_code)
+        'players': get_sorted_players(lobby_code),
+        'question_number': lobbies[lobby_code].get('question_number', 1),
+        'question_nominal': lobbies[lobby_code].get('question_nominal', 10)
     }), 200
 
 def process_lobby_clicks(lobby_code):
@@ -256,10 +309,12 @@ def get_lobby_info():
     return jsonify({
         'status': 'success',
         'lobby_name': lobbies[lobby_code]['name'],
-        'players': sorted_players,    # Список email отсортированных по очкам
-        'scores': sorted_scores,      # Соответствующие очки
+        'players': sorted_players,  # список игроков с их очками
+        'scores': sorted_scores,
         'owner': lobbies[lobby_code]['owner'],
-        'respondent': lobbies[lobby_code]['respondent']
+        'respondent': lobbies[lobby_code]['respondent'],
+        'question_number': lobbies[lobby_code].get('question_number', 1),
+        'question_nominal': lobbies[lobby_code].get('question_nominal', 10)
     }), 200
 
 
@@ -381,4 +436,3 @@ if __name__ == '__main__':
     socketio.run(app, debug=True, host="0.0.0.0", port=5000)
 
 ####
-

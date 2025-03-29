@@ -101,34 +101,30 @@ export default {
           this.players = data.players;
           this.scores = data.scores;
           this.owner = data.owner;
-          this.respondent =  data.respondent;
-          // Проверяем, что игрок есть в лобби
-          const isPlayerInLobby = this.players.includes(this.email); // или this.playerName
+          this.respondent = data.respondent;
+          // Если сервер возвращает question_number и question_nominal,
+          // передаём их в родительский компонент для обновления home-page
+          this.$emit('update-lobby-info', {
+            owner: this.owner,
+            respondent: this.respondent,
+            question_number: data.question_number,
+            question_nominal: data.question_nominal
+          });
+          // Дополнительно можно проверять, что игрок есть в лобби и выполнять прочие действия
+          const isPlayerInLobby = this.players.includes(this.email);
           if (!isPlayerInLobby) {
             console.log('Игрок не найден в лобби, выполняем выход');
             this.leaveLobby();
-          }
-          // Если не владелец и аудио уже получено – мьютим
-          if (!this.isOwner && this.localStream && this.respondent != this.email) {
-            this.isMuted = true;
-            this.localStream.getAudioTracks().forEach(track => {
-              track.enabled = false;
-            });
           }
         } else {
           this.stopPolling();
           this.$emit('leave-lobby');
         }
-        this.$emit('update-lobby-info', {
-          owner: this.owner,
-          respondent: this.respondent
-        });
-
-      }
-      catch (error) {
+      } catch (error) {
         this.leaveLobby();
       }
     },
+    
     async leaveLobby() {
       try {
         console.log("Покидаем лобби...");
