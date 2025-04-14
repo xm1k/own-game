@@ -20,48 +20,39 @@ def get_player_id_by_login(login: str) -> int | None:
 def hashp(password):
     h = 0
     for char in password:
-        h = h * 257 + ord(char)  # Используем ASCII-код символа
+        h = h * 257 + ord(char) 
     return h
-
-
 def expected_score(rating_a, rating_b):
     """
     Рассчитывает ожидаемый результат для игрока A против игрока B.
     """
-    return 1 / (1 + 10 ** ((rating_b - rating_a) / 100))
+    return 1 / (1 + 10 ** ((rating_b - rating_a) / 400))
 
-def update_elo_ratings(ratings, results, players, k):
+def update_elo_ratings(ratings, results, k=32):
     """
     Обновляет рейтинги игроков на основе результатов матча.
 
     :param ratings: Список текущих рейтингов игроков.
-    :param results: Список результатов
+    :param results: Список результатов в очках ([10 20 30])
     :param k: Коэффициент K для системы Эло (по умолчанию 32).
     :return: Список обновленных рейтингов.
     """
-    n = len(players)
-    new_ratings = ratings.copy()
+    n = len(ratings)
+    new_ratings = [0]*len(ratings)
+
     for i in range(n):
-        actual_score = 0
-        for j in range(len(results)):
-            if i != j:
-                if results[i]>results[j]:
-                    actual_score += 1
-                elif results[i]>results[j]:
-                    actual_score += 0.5
+        actual_score = results[i]
+        expected_score_total = 0
 
         # Рассчитываем общий ожидаемый результат для игрока i
-        expected_score_total = 0
         for j in range(n):
             if i != j:
                 expected_score_total += expected_score(ratings[i], ratings[j])
 
         # Обновляем рейтинг игрока i
-        new_ratings[i] += int(round(k * (actual_score - expected_score_total),0))
+        new_ratings[i] = round(k * (actual_score - expected_score_total))
 
     return new_ratings
-
-
 
 # Модель Player
 class Player(db.Model):
@@ -104,30 +95,39 @@ clicks_per_lobby={}
 
 def update_lobby_members(lobby_code):
     s_players,s_scores=get_sorted_players_and_scores(lobby_code)
-    changes_raiting=[1]*len(s_players)
-    print(s_players,s_scores)
+    rat=[]
+    print(s_players)
+    print(s_scores)
+    for i in range(len(s_players)):
+            pi_id=get_player_id_by_login(s_players[i])
+            player = db.session.get(Player, pi_id)
+            rat.append(player.rating)
+    changes_raiting=update_elo_ratings(rat,s_scores)
+    print(rat)
+    print(changes_raiting)
     try:
+        print(s_players)
         for i in range(len(s_players)):
+            print(s_players[i])
             p_id=get_player_id_by_login(s_players[i])
+            print(p_id)
             member = LobbyMembers.query.filter_by(lobby_id=lobby_code,player_id=p_id).first()
             if not member:
-                return jsonify({"message": "В лобби нет участникa"}), 200
+                continue
             member.points=s_scores[i]
             member.change_rating=changes_raiting[i]
             member.plase=i+1
             member.points=s_scores[i]
             db.session.commit()
             player = db.session.get(Player, p_id)
-            print(p_id)
-            print(player)
             if player:
-                print(changes_raiting[i])
                 player.rating += changes_raiting[i]
                 db.session.commit()
-                return jsonify({'status': 'success', 'message': 'Все данные обновлены'}), 200
-            return jsonify({"message": "В лобби нет участникa"}), 200
+            else:
+                return jsonify({"message": "В лобби нет участникa"}), 200
 
     except Exception as e:
+        print("jopa")
         db.session.rollback()
         return jsonify({"error": f"Ошибка базы данных: {str(e)}"}), 500
 def get_sorted_players_and_scores(lobby_code):
@@ -237,7 +237,7 @@ def register():
             login=email,
             password=hashp(Password),
             nickname=name,
-            rating=0
+            rating=1500
         )
         db.session.add(new_player)
         db.session.commit()
@@ -361,7 +361,7 @@ def join_lobby():
     if not lobby_code or not player_name:
         return jsonify({'status': 'error', 'message': 'Не указан код лобби или имя игрока'}), 400
     L=Lobby.query.filter_by(lobby_id=lobby_code).first()
-    if not L:
+    if not L or not L.active:
         return jsonify({'status': 'error', 'message': 'Лобби не найдено'}), 404
 
     # Добавление игрока в лобби
