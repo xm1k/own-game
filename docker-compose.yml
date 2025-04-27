@@ -1,0 +1,53 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:16
+    container_name: own-game-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "777"
+      POSTGRES_DB: ssi
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ssi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      # plain‑SQL‑дамп без DROP‑операций
+      - ./backend/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: own-game-backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:777@db/ssi
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: own-game-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./frontend:/app
+    command: npm run serve
+networks:
+  default:
+    driver: bridge
