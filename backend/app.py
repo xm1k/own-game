@@ -199,6 +199,21 @@ def get_sorted_players(lobby_code):
         'score': item['score']
     } for item in sorted_players]
 
+@app.route('/players', methods=['GET'])
+def get_all_players():
+    # Получаем всех игроков, сортируем по рейтингу по убыванию
+    players = Player.query.order_by(Player.rating.desc()).all()
+
+    # Формируем ответ: порядок, имя и рейтинг
+    result = []
+    for index, p in enumerate(players, start=1):
+        result.append({
+            'place': index,
+            'name': p.nickname,
+            'rating': p.rating
+        })
+    return jsonify({'status': 'success', 'players': result}), 200
+
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()

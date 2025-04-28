@@ -1,30 +1,19 @@
   <template>
     <div class="home-page">
       <!-- Блок вопроса и таймера (синхронизирован для всех) -->
-      <div class="question-container" v-if="inLobby">
-        <h2 class="question-label">{{ questionLabel }}</h2>
-        <div v-if="timerVisible" class="timer-display">
-          {{ timerValue }}
-        </div>
-        <!-- Кнопка для владельца, чтобы запустить отсчёт (видна, если никто ещё не отвечает и таймер не активен) -->
-        <div v-if="isOwner && !respondent && !timerVisible" class="owner-controls">
-          <button @click="startTimer" class="finish-btn">Закончить вопрос</button>
-        </div>
-        <!-- Новая кнопка для владельца: Завершить игру, видна только когда кто-то отвечает -->
-        <div v-if="isOwner" class="owner-controls">
-          <button @click="endGame" class="end-game-btn">Завершить игру</button>
-        </div>
-      </div>
-
       <!-- Боковая панель с информацией о пользователе и действиями -->
       <div class="panel-block">
-        <div class="user" style="border-radius: 25px 0px 25px 0px; padding: 10px 0px;">
+        <div class="user" style="border-radius: 25px 25px 0px 0px; padding: 10px 0px;">
           <div class="profile">
             <img src="../assets/user.webp" alt="" style="height: 45px; margin-right: 10px;">
             <h1>{{ username }}</h1>
           </div>
         </div>
-        <hr>
+        <div class="user-stats" v-if="email">
+          <p><strong>Почта:</strong> {{ email }}</p>
+          <p><strong>Место:</strong> {{ userStats.place || '—' }}</p>
+          <p><strong>Рейтинг:</strong> {{ userStats.rating || '—' }}</p>
+        </div>
         <div class="container">
           <div v-if="!inLobby" class="actions">
             <button @click="showCreateLobbyModal = true">Создать лобби</button>
@@ -59,6 +48,39 @@
               <button @click="closeModal" class="red-but">Отмена</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div class="question-container" v-if="inLobby">
+        <h2 class="question-label">{{ questionLabel }}</h2>
+        <div v-if="timerVisible" class="timer-display">
+          {{ timerValue }}
+        </div>
+        <!-- Кнопка для владельца, чтобы запустить отсчёт (видна, если никто ещё не отвечает и таймер не активен) -->
+        <div v-if="isOwner && !respondent && !timerVisible" class="owner-controls">
+          <button @click="startTimer" class="finish-btn">Закончить вопрос</button>
+        </div>
+        <!-- Новая кнопка для владельца: Завершить игру, видна только когда кто-то отвечает -->
+        <div v-if="isOwner" class="owner-controls">
+          <button @click="endGame" class="end-game-btn">Завершить игру</button>
+        </div>
+      </div>
+
+
+      <div class="central-blocks" v-if="!inLobby">
+        <!-- Блок списка игроков -->
+        <div class="players-panel" style="overflow: clip; margin-bottom: 20px;" >
+          <h3>Таблица рейтинга</h3>
+          <ul>
+            <li v-for="player in players" :key="player.place">
+              <span style="background-color: #2d2959; color: white; padding: 10px 15px; border-radius: 15px; margin-right: 20px;">{{ player.place }}</span>{{ player.name }}<span style="margin-left: 20px;">{{ player.rating }}</span>
+            </li>
+          </ul>
+        </div>
+        <!-- Пустой блок лобби -->
+        <div class="lobby-panel">
+          <h3>Список лобби ( to be continued )</h3>
+          <!-- Пока только фон -->
         </div>
       </div>
 
@@ -100,7 +122,8 @@
         timerInterval: null,
         questionNumber: 1,
         questionNominal: 10,
-        socket: null
+        socket: null,
+        players: []
       };
     },
     computed: {
@@ -109,6 +132,10 @@
       },
       isOwner() {
         return this.email === this.owner;
+      },
+      userStats(){
+        const me = this.players.find(p => p.name === this.username);
+        return me || {};
       }
     },
     created() {
@@ -134,6 +161,7 @@
       this.socket.on('stop_timer', () => {
         this.stopTimer();
       });
+      this.fetchPlayers();
     },
     methods: {
       async handleResponse(status) {
@@ -162,6 +190,17 @@
           console.error("Ошибка при отправке статуса ответа:", error);
         }
       },
+      async fetchPlayers() {
+            try {
+              const response = await fetch('http://localhost:5000/players');
+              const data = await response.json();
+              if (data.status === 'success') {
+                this.players = data.players;
+              }
+            } catch (error) {
+              console.error('Ошибка при получении списка игроков:', error);
+            }
+          },
       updateLobbyInfo({ owner, respondent, question_number, question_nominal }) {
         this.owner = owner;
         this.respondent = respondent;
@@ -333,7 +372,73 @@
 
 
 
-  <style>
+<style>
+
+.user-stats{
+  background-color: rgba(0,0,0,0.1);
+  width: 100%;
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 18px;
+
+}
+
+.central-blocks {
+  width: 50%;
+  display: flex;
+  justify-content: space-around;
+  flex-direction: column;
+  margin: 20px;
+}
+.players-panel, .lobby-panel {
+  width: auto;
+  height: 300px;
+  background-color: #164a9e;
+  border-radius: 10px;
+  padding: 15px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.players-panel h3, .lobby-panel h3 {
+  color: white;
+  margin-top: 0;
+}
+
+.players-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48%, 1fr));
+  /* auto-fill подберёт по ширине, minmax — минимальная ширина колонки */
+  gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.players-panel li {
+  background-color: white;
+  border-radius: 15px;
+  padding: 15px;
+  font-weight: bold;
+  font-family: 'Arial';
+  text-align: left;
+
+  margin: 5px 0;
+  font-size: 16px;
+}
+.lobby-panel {
+  /* Пока только фон -- можно менять позже */
+  background-size: cover;
+  background-position: center;
+}
+
+.home-page {
+  display: flex;
+  width: 100%;
+}
+
   body {
     padding: 0;
     margin: 0;
@@ -348,6 +453,8 @@
     padding: 20px;
     border-radius: 10px;
     margin: 15px;
+    width: 50%;
+    height: 100px;
   }
 
   .question-label {
