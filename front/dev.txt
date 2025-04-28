@@ -1,0 +1,13 @@
+front
+core
+eslint-parser
+cli-plugin-babel
+cli-plugin-eslint
+cli-service
+axios
+core-js
+eslint-plugin-vue
+eslint
+socket.io-client
+vue-template-compiler
+vue

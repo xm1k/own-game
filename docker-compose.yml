@@ -45,8 +45,6 @@ services:
       - backend
     ports:
       - "8080:8080"
-    volumes:
-      - ./front:/app
     command: npm run serve
 networks:
   default:

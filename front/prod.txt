@@ -1,0 +1,5 @@
+front
+axios
+core-js
+socket.io-client
+vue

@@ -1,20 +1,16 @@
-### frontend/Dockerfile
-FROM node:16-alpine
+# front/Dockerfile
+FROM node:18-alpine
 
-# Рабочая директория
 WORKDIR /app
 
-# Копируем package.json и package-lock.json (если есть)
+# 1) копируем манифесты и ставим все deps
 COPY package*.json ./
+RUN npm ci
 
-# Устанавливаем зависимости
-RUN npm install
-
-# Копируем весь фронтенд-код
+# 2) копируем код
 COPY . .
 
-# Открываем порт разработки
 EXPOSE 8080
 
-# Запуск dev-сервера Vue
 CMD ["npm", "run", "serve"]
+
