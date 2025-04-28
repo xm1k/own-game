@@ -35,18 +35,18 @@ services:
     volumes:
       - ./backend:/app
 
-  frontend:
+  front:
     build:
-      context: ./frontend
+      context: ./front
       dockerfile: Dockerfile
-    container_name: own-game-frontend
+    container_name: own-game-front
     restart: always
     depends_on:
       - backend
     ports:
       - "8080:8080"
     volumes:
-      - ./frontend:/app
+      - ./front:/app
     command: npm run serve
 networks:
   default:
