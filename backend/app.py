@@ -10,7 +10,7 @@ from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)
 
 # Подключение к БД: читаем из переменной окружения или используем сервис db
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
@@ -80,7 +80,7 @@ class LobbyMembers(db.Model):
     player_id = db.Column(db.BigInteger, db.ForeignKey('players.id'), primary_key=True)
     lobby_id = db.Column(db.BigInteger, db.ForeignKey('lobbies.lobby_id'), primary_key=True)
     joined_at = db.Column(db.DateTime, default=datetime.now())
-    plase = db.Column(db.Integer)
+    place = db.Column(db.Integer)
     points = db.Column(db.Integer)
     change_rating = db.Column(db.Integer)
     player = db.relationship('Player', back_populates='lobby_memberships')
@@ -126,7 +126,7 @@ def update_lobby_members(lobby_code):
                 continue
             member.points=s_scores[i]
             member.change_rating=changes_raiting[i]
-            member.plase=i+1
+            member.place=i+1
             member.points=s_scores[i]
             db.session.commit()
             player = db.session.get(Player, p_id)
@@ -190,9 +190,9 @@ def get_sorted_players(lobby_code):
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
+    print('Received data:', data, flush=True)
     if not data:
         return jsonify({'status': 'error', 'message': 'No JSON data received'}), 400
-    print('Received data:', data)
 
     email = data.get('email')
     password = data.get('password')
@@ -200,8 +200,9 @@ def login():
     print('Email:', email, 'Password:', password)
     player = Player.query.filter_by(login=email).first()
     print(player.password)
-    if hashp(password) == player.password:
-        return jsonify({'status': 'success', 'message': 'Вход успешен', 'name': "name"}), 200
+    if (password) == player.password:
+        print('sucess', player.login)
+        return jsonify({'status': 'success', 'message': 'Вход успешен', 'name': player.nickname}), 200
     return jsonify({'status': 'error', 'message': 'Неверный email или пароль'}), 400
 
 @app.route('/responsestatus', methods=['POST'])
@@ -245,7 +246,7 @@ def register():
     if email and Password and name:
         new_player = Player(
             login=email,
-            password=hashp(Password),
+            password=(Password),
             nickname=name,
             rating=1500
         )
@@ -376,6 +377,7 @@ def join_lobby():
 
     # Добавление игрока в лобби
     a_id=get_player_id_by_login(player_name)
+    print(a_id, player_name, lobby_code, flush=True)
     if not is_player_in_lobby(lobby_code,a_id):
         new_l_m=LobbyMembers(
             player_id=a_id,
