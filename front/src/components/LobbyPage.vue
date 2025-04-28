@@ -108,6 +108,25 @@ export default {
         this.leaveLobby();
       }
     },
+    async handleIceCandidate({ sender_id, candidate }) {
+      const peer = this.peers[sender_id];
+      if (peer && candidate) {
+        try {
+          await peer.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.error('Ошибка при добавлении ICE-кандидата:', err);
+        }
+      }
+    },
+
+    // Обработка отключения пользователя
+    handleUserDisconnect({ user_id }) {
+      const peer = this.peers[user_id];
+      if (peer) {
+        peer.close();
+        delete this.peers[user_id];
+      }
+    },
     async initMediaAndSocket() {
       // 1. Получаем локальный аудио-поток
       try {

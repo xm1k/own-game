@@ -57,12 +57,14 @@
           {{ timerValue }}
         </div>
         <!-- Кнопка для владельца, чтобы запустить отсчёт (видна, если никто ещё не отвечает и таймер не активен) -->
-        <div v-if="isOwner && !respondent && !timerVisible" class="owner-controls">
-          <button @click="startTimer" class="finish-btn">Закончить вопрос</button>
-        </div>
-        <!-- Новая кнопка для владельца: Завершить игру, видна только когда кто-то отвечает -->
-        <div v-if="isOwner" class="owner-controls">
-          <button @click="endGame" class="end-game-btn">Завершить игру</button>
+        <div style="display: flex; padding: 30px 30px; justify-content: center; align-items: center;">
+          <div v-if="isOwner && !respondent && !timerVisible" class="owner-controls" style="margin-right: 30px;">
+            <button @click="startTimer" class="finish-btn">Закончить вопрос</button>
+          </div>
+          <!-- Новая кнопка для владельца: Завершить игру, видна только когда кто-то отвечает -->
+          <div v-if="isOwner" class="owner-controls">
+            <button @click="endGame" class="end-game-btn">Завершить игру</button>
+          </div>
         </div>
       </div>
 
@@ -87,13 +89,15 @@
       <!-- Красная кнопка для участников, останавливающая таймер -->
       <button v-if="inLobby && shouldShowBigBut" @click="sendClickTimestamp" class="big-but"></button>
       <!-- Информация об отвечающем -->
-      <h1 v-if="respondent !== '' && inLobby" class="respondent-label">
-        Отвечает {{ respondent }}
-      </h1>
-      <!-- Кнопки владельца для проверки ответа -->
-      <div v-if="respondent !== '' && isOwner && inLobby" class="response-buttons">
-        <button @click="handleResponse('correct')" class="correct-but">Верно</button>
-        <button @click="handleResponse('incorrect')" class="incorrect-but">Не верно</button>
+      <div class="respondent" v-if="respondent !== '' && inLobby">
+        <h1 v-if="respondent !== '' && inLobby" class="respondent-label">
+          Отвечает {{ respondent }}
+        </h1>
+        <!-- Кнопки владельца для проверки ответа -->
+        <div v-if="respondent !== '' && isOwner && inLobby" class="response-buttons">
+          <button @click="handleResponse('correct')" class="correct-but">Верно</button>
+          <button @click="handleResponse('incorrect')" class="incorrect-but">Не верно</button>
+        </div>
       </div>
     </div>
   </template>
@@ -450,40 +454,29 @@
     background: linear-gradient(135deg, #446ead, #3b5998);
     color: #fff;
     text-align: center;
-    padding: 20px;
+    padding: 40px;
     border-radius: 10px;
     margin: 15px;
     width: 50%;
-    height: 100px;
+    height: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .question-label {
     font-size: 24px;
-    margin-bottom: 10px;
   }
 
   .timer-display {
     font-size: 32px;
     font-weight: bold;
     margin-bottom: 10px;
+    margin-left: 30px;
   }
 
   .owner-controls {
     margin-top: 10px;
-  }
-
-  .finish-btn {
-    background-color: #f0ad4e;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 5px;
-    font-size: 16px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-  }
-
-  .finish-btn:hover {
-    background-color: #ec971f;
   }
 
   /* Стили для остальных блоков остаются без изменений */
@@ -550,11 +543,24 @@
     box-shadow: 0px 10px 0px darkred;
   }
 
-  .respondent-label {
-    color: #fff;
-    position: absolute;
-    right: 45%;
+  .respondent{
+    border-radius: 15px;
+    position: fixed;
+    padding: 50px 0;
     top: 20%;
+    left: 40%;
+    width: 20%;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    height: auto;
+    background-color: rgba(0,0,0,0.1);
+  }
+
+  .respondent-label {
+    margin-bottom: 20px;
+    color: #fff;
     margin: 0;
   }
 
@@ -710,9 +716,7 @@
   }
 
   .response-buttons {
-    position: absolute;
-    right: 45%;
-    top: 30%;
+    margin-top: 40px;
     display: flex;
     gap: 10px;
   }
@@ -729,13 +733,33 @@
   }
 
   .correct-but:hover {
-    background-color: green;
+    background-color: #49824b;
     color: white;
+    padding: 10px 20px;
+    border: 0;
+    border-radius: 5px;
   }
 
   .incorrect-but:hover {
-    background-color: red;
+    background-color: #d95252;
     color: white;
     padding: 10px 20px;
+    border: 0;
+    border-radius: 5px;
   }
+
+  .finish-btn, .end-game-btn {
+    background-color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+
+  .finish-btn:hover, .end-game-btn:hover {
+    background-color: #d95252;
+  }
+
   </style>
