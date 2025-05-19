@@ -110,6 +110,7 @@ class Lobby(db.Model):
 #вместо надо будет подключить redis
 lobbiestmp={}
 clicks_per_lobby={}
+processing_lobbies = set()
 
 def update_lobby_members(lobby_code):
     s_players,s_scores=get_sorted_players_and_scores(lobby_code)
@@ -431,27 +432,33 @@ def is_player_in_lobby(lobby_id: int, player_id: int):
     return membership is not None
 
 def process_lobby_clicks(lobby_code):
-    """ Ждет секунду после первого клика и определяет победителя. """
-    time.sleep(1)  # Ждем секунду после первого клика
+    """
+    Ждём 1 секунду с момента первого клика, 
+    затем выбираем победителя (самый маленький timestamp) 
+    и рассылаем всем в лобби.
+    """
+    # Ожидаем сбора всех кликов в течение секунды
+    time.sleep(1)
 
-    if lobby_code in clicks_per_lobby and clicks_per_lobby[lobby_code]:
-        # Сортируем клики по времени
-        sorted_clicks = sorted(clicks_per_lobby[lobby_code], key=lambda x: x['timestamp'])
-        winner = sorted_clicks[0]  # Первый клик — победитель
+    # Достанем и очистим накопленные клики
+    clicks = clicks_per_lobby.pop(lobby_code, [])
 
-        print(f"Победитель в лобби {lobby_code}: {winner['email']} нажал в {winner['timestamp']} мс")
+    if clicks:
+        # Сортируем по timestamp и берём первый
+        winner = min(clicks, key=lambda x: x['timestamp'])
 
+        # Сохраняем результат в лобби
         lobbiestmp[lobby_code]['respondent'] = winner['email']
 
-        # Отправляем результат в лобби через WebSocket
+        # Эмитим событие победителя
         socketio.emit('click_winner', {
             'lobby_code': lobby_code,
             'winner_email': winner['email'],
             'winner_timestamp': winner['timestamp']
         }, room=lobby_code)
 
-        # Очищаем список кликов для этого лобби
-        clicks_per_lobby.pop(lobby_code, None)
+    # Убираем флаг обработки, чтобы на следующий клик можно было снова запустить поток
+    processing_lobbies.discard(lobby_code)
 
 @app.route('/get-lobby-info', methods=['POST'])
 def get_lobby_info():
@@ -502,26 +509,39 @@ def leave_lobby():
 
 @app.route('/click-timestamp', methods=['POST'])
 def receive_click_timestamp():
-    data = request.json
+    data = request.get_json()
     timestamp = data.get('timestamp')
     email = data.get('email', 'Не указан')
-    lobby_code = int(data.get('lobby_code'))
+    lobby_code = int(data.get('lobby_code', 0))
 
     if not timestamp or not lobby_code:
         return jsonify({'status': 'error', 'message': 'Нет данных о клике'}), 400
 
-    print(f"Пользователь {email} нажал кнопку в {timestamp} мс, в лобби: {lobby_code}")
-
-    # Добавляем клик в хранилище
+    # Инициализируем список кликов, если первый раз
     if lobby_code not in clicks_per_lobby:
         clicks_per_lobby[lobby_code] = []
-        # Запускаем поток для обработки кликов в этом лобби
-        thread = threading.Thread(target=process_lobby_clicks, args=(lobby_code,))
+
+    # Добавляем текущий клик
+    clicks_per_lobby[lobby_code].append({
+        'email': email,
+        'timestamp': timestamp
+    })
+
+    # Запускаем обработчик только один раз за «раунд»
+    if lobby_code not in processing_lobbies:
+        processing_lobbies.add(lobby_code)
+        thread = threading.Thread(
+            target=process_lobby_clicks,
+            args=(lobby_code,),
+            daemon=True
+        )
         thread.start()
 
-    clicks_per_lobby[lobby_code].append({'email': email, 'timestamp': timestamp})
-
-    return jsonify({'status': 'success', 'received_timestamp': timestamp, 'email': email})
+    return jsonify({
+        'status': 'success',
+        'received_timestamp': timestamp,
+        'email': email
+    }), 200
 
 
 @socketio.on('connect')
