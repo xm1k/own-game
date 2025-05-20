@@ -14,10 +14,19 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      # plain‑SQL‑дамп без DROP‑операций
       - ./backend/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     ports:
       - "5432:5432"
+
+  redis:
+    image: redis:alpine
+    container_name: own-game-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
 
   backend:
     build:
@@ -46,6 +55,10 @@ services:
     ports:
       - "8080:8080"
     command: npm run serve
+
+volumes:
+  redis_data:
+
 networks:
   default:
     driver: bridge
