@@ -64,7 +64,6 @@ def expected_score(rating_a, rating_b):
 def update_elo_ratings(ratings, results, k=32):
     """
     Обновляет рейтинги игроков на основе результатов матча.
-
     :param ratings: Список текущих рейтингов игроков.
     :param results: Список результатов в очках ([10 20 30])
     :param k: Коэффициент K для системы Эло (по умолчанию 32).
@@ -72,18 +71,20 @@ def update_elo_ratings(ratings, results, k=32):
     """
     n = len(ratings)
     new_ratings = [0] * len(ratings)
-
-    for i in range(n):
-        actual_score = results[i]
-        expected_score_total = 0
+    if n ==1:
+        new_ratings[0]=0
+    else:
+        for i in range(n):
+            actual_score = results[i]
+            expected_score_total = 0
 
         # Рассчитываем общий ожидаемый результат для игрока i
-        for j in range(n):
-            if i != j:
-                expected_score_total += expected_score(ratings[i], ratings[j])
+            for j in range(n):
+                if i != j:
+                    expected_score_total += expected_score(ratings[i], ratings[j])
 
         # Обновляем рейтинг игрока i
-        new_ratings[i] = round(k * (actual_score - expected_score_total))
+            new_ratings[i] = round(k * (actual_score - expected_score_total))
 
     return new_ratings
 
