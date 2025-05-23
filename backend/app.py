@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 import redis
 import json  # Import json module
-
+import hashlib  # Import hashlib for hashing
 
 app = Flask(__name__)
 CORS(app)
@@ -48,10 +48,9 @@ def get_lobby_name_by_id(lobby_code: int) -> str | str:
 
 
 def hashp(password):
-    h = 0
-    for char in password:
-        h = h * 257 + ord(char)
-    return h
+    """Hashes a password using SHA-256."""
+    hashed_password = hashlib.sha256(password.encode('utf-8')).hexdigest()
+    return hashed_password
 
 
 def expected_score(rating_a, rating_b):
@@ -68,31 +67,31 @@ def update_elo_ratings(ratings, results, k=16):
     :param k: Коэффициент K для системы Эло (выбран 16).
     :return: Изменения рейтингов.
     """
-    Lp_no_1=0
+    Lp_no_1 = 0
     n = len(ratings)
     new_ratings = [0] * n
-    n_results=[0]*n
-    if n ==1: #проверка на количество игроков
-        new_ratings[0]=0
-    else: 
-        for i in range(n-1): #цикл пересчитывает результат в очках за вопросы в результат, выраженный через занятое место
-            if n_results[i]==0:   #проверка на то, была ли уже найдена ничья
-                if not(results[i] in results[i+1:]): #проверка на ничью
-                    n_results[i]=(n-1)/2**i 
+    n_results = [0] * n
+    if n == 1:  # проверка на количество игроков
+        new_ratings[0] = 0
+    else:
+        for i in range(n - 1):  # цикл пересчитывает результат в очках за вопросы в результат, выраженный через занятое место
+            if n_results[i] == 0:  # проверка на то, была ли уже найдена ничья
+                if not (results[i] in results[i + 1:]):  # проверка на ничью
+                    n_results[i] = (n - 1) / 2 ** i
                 else:
-                    k=results[i+1:].count(results[i]) # находятся все игркои с ничьей
-                    for j in range(i,i+k+1): #всем игрокам с ничьей присваевается одно значение
-                        n_results[j]=n_results[i]=(n-1)/2**((i+i+k)/2)
-                    
+                    k = results[i + 1:].count(results[i])  # находятся все игркои с ничьей
+                    for j in range(i, i + k + 1):  # всем игрокам с ничьей присваевается одно значение
+                        n_results[j] = n_results[i] = (n - 1) / 2 ** ((i + i + k) / 2)
+
         for i in range(n):
             actual_score = n_results[i]
             expected_score_total = 0
-        # Рассчитываем общий ожидаемый результат для игрока i
+            # Рассчитываем общий ожидаемый результат для игрока i
             for j in range(n):
                 if i != j:
                     expected_score_total += expected_score(ratings[i], ratings[j])
 
-        # Обновляем рейтинг игрока i
+            # Обновляем рейтинг игрока i
             new_ratings[i] = round(k * (actual_score - expected_score_total))
 
     return new_ratings
@@ -103,11 +102,10 @@ class Player(db.Model):
     __tablename__ = 'players'
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     login = db.Column(db.Text, unique=True)
-    password = db.Column(db.BigInteger)
+    password = db.Column(db.Text)
     nickname = db.Column(db.Text)
     rating = db.Column(db.Integer)
     lobby_memberships = db.relationship('LobbyMembers', back_populates='player')
-
 
 # Модель LobbyMembers
 class LobbyMembers(db.Model):
@@ -120,7 +118,6 @@ class LobbyMembers(db.Model):
     change_rating = db.Column(db.Integer)
     player = db.relationship('Player', back_populates='lobby_memberships')
     lobby = db.relationship('Lobby', back_populates='members')
-
 
 # Модель Lobby
 class Lobby(db.Model):
@@ -150,10 +147,12 @@ def delete_lobby_redis(lobby_code: int):
     """Deletes lobby data from Redis."""
     redis_client.delete(f"lobby:{lobby_code}")
 
+
 def get_clicks(lobby_code):
     """Retrieves clicks data from Redis."""
     clicks_data = redis_client.get(f"clicks:{lobby_code}")
     return json.loads(clicks_data) if clicks_data else None
+
 
 def set_clicks(lobby_code: int, clicks_data: dict):
     """Sets clicks data in Redis."""
@@ -206,7 +205,6 @@ def update_lobby_members(lobby_code):
                 return jsonify({"message": "В лобби нет участникa"}), 200
 
     except Exception as e:
-        print("jopa")
         db.session.rollback()
         return jsonify({"error": f"Ошибка базы данных: {str(e)}"}), 500
 
@@ -215,7 +213,7 @@ def get_sorted_players_and_scores(lobby_code):
     """Возвращает два списка: игроки и их очки, отсортированные по убыванию"""
     lobby = get_lobby(lobby_code)
     if not lobby:
-      return [], []
+        return [], []
 
     # Собираем пары (email, score) для онлайн-игроков
     players_with_scores = []
@@ -237,7 +235,7 @@ def get_sorted_players(lobby_code):
     """Возвращает отсортированный список игроков с очками"""
     lobby = get_lobby(lobby_code)
     if not lobby:
-      return []
+        return []
 
     online_players = lobby['online']
 
@@ -293,8 +291,7 @@ def login():
 
     print('Email:', email, 'Password:', password)
     player = Player.query.filter_by(login=email).first()
-    print(player.password)
-    if (password) == player.password:
+    if player and hashp(password) == player.password: #сравниваем хешированные пароли
         print('sucess', player.login)
         return jsonify({'status': 'success', 'message': 'Вход успешен', 'name': player.nickname}), 200
     return jsonify({'status': 'error', 'message': 'Неверный email или пароль'}), 400
@@ -337,15 +334,16 @@ def responsestatus():
 def register():
     data = request.get_json()
     email = data.get('email')
-    Password = data.get('password')
+    password = data.get('password')
     name = data.get('name')
 
-    print(f"Регистрация: {email}, {Password}, {name}")
+    print(f"Регистрация: {email}, {password}, {name}")
 
-    if email and Password and name:
+    if email and password and name:
+        hashed_password = hashp(password)  # Hash the password
         new_player = Player(
             login=email,
-            password=(Password),
+            password=hashed_password,  # Store the hashed password
             nickname=name,
             rating=1500
         )
@@ -482,8 +480,7 @@ def join_lobby():
     lobby = get_lobby(lobby_code)
 
     if not lobby:
-      return jsonify({'status': 'error', 'message': 'Лобби не найдено в Redis'}), 404
-
+        return jsonify({'status': 'error', 'message': 'Лобби не найдено в Redis'}), 404
 
     if player_name not in lobby['online']:
         lobby['online'].append(player_name)
