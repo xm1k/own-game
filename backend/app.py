@@ -61,23 +61,32 @@ def expected_score(rating_a, rating_b):
     return 1 / (1 + 10 ** ((rating_b - rating_a) / 400))
 
 
-def update_elo_ratings(ratings, results, k=32):
+def update_elo_ratings(ratings, results, k=16):
     """
-    Обновляет рейтинги игроков на основе результатов матча.
     :param ratings: Список текущих рейтингов игроков.
     :param results: Список результатов в очках ([10 20 30])
-    :param k: Коэффициент K для системы Эло (по умолчанию 32).
-    :return: Список обновленных рейтингов.
+    :param k: Коэффициент K для системы Эло (выбран 16).
+    :return: Изменения рейтингов.
     """
+    Lp_no_1=0
     n = len(ratings)
-    new_ratings = [0] * len(ratings)
-    if n ==1:
+    new_ratings = [0] * n
+    n_results=[0]*n
+    if n ==1: #проверка на количество игроков
         new_ratings[0]=0
-    else:
+    else: 
+        for i in range(n-1): #цикл пересчитывает результат в очках за вопросы в результат, выраженный через занятое место
+            if n_results[i]==0:   #проверка на то, была ли уже найдена ничья
+                if not(results[i] in results[i+1:]): #проверка на ничью
+                    n_results[i]=(n-1)/2**i 
+                else:
+                    k=results[i+1:].count(results[i]) # находятся все игркои с ничьей
+                    for j in range(i,i+k+1): #всем игрокам с ничьей присваевается одно значение
+                        n_results[j]=n_results[i]=(n-1)/2**((i+i+k)/2)
+                    
         for i in range(n):
-            actual_score = results[i]
+            actual_score = n_results[i]
             expected_score_total = 0
-
         # Рассчитываем общий ожидаемый результат для игрока i
             for j in range(n):
                 if i != j:
