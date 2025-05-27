@@ -170,8 +170,7 @@ processing_lobbies = set()
 def update_lobby_members(lobby_code):
     s_players, s_scores = get_sorted_players_and_scores(lobby_code)
     rat = []
-    print(s_players)
-    print(s_scores)
+    index=0
     lob = Lobby.query.filter_by(lobby_id=lobby_code).first()
     for i in range(len(s_players)):
         pi_id = get_player_id_by_login(s_players[i])
@@ -179,7 +178,10 @@ def update_lobby_members(lobby_code):
         if (pi_id != lob.admin_id):
             rat.append(player.rating)
         else:
-            rat.append(0)
+            index=i
+    s_scores.pop(index)
+    s_players.pop(index)
+    print(s_scores)        
     changes_raiting = update_elo_ratings(rat, s_scores)
     print(rat)
     print(changes_raiting)
@@ -190,8 +192,6 @@ def update_lobby_members(lobby_code):
             p_id = get_player_id_by_login(s_players[i])
             # print(p_id)
             member = LobbyMembers.query.filter_by(lobby_id=lobby_code, player_id=p_id).first()
-            if not member:
-                continue
             member.points = s_scores[i]
             member.change_rating = changes_raiting[i]
             member.place = i + 1
